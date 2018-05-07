@@ -1,6 +1,6 @@
-URL = 'https://camaloon.es'
+URL = 'https://supercalorias.com'
 CONCURRENCY = 3
 
 require_relative 'replicator'
 
-Replicator.new('camaloon', URL, CONCURRENCY).run!
+Replicator.new('supercalorias', URL, CONCURRENCY).run!

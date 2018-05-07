@@ -4,7 +4,7 @@ require 'bundler/setup'
 require 'concurrent'
 require "sqlite3"
 require 'fileutils'
-
+require "addressable/uri"
 
 require_relative 'page_crawler'
 
@@ -19,6 +19,7 @@ class Replicator
     FileUtils.mkdir_p(@website)
 
     if (urls = WorkerPool.pool(@website).borrow { |worker| worker.pending_urls } ) && urls.any?
+      WorkerPool.pool(@website).borrow { |worker| worker.clean_pending_urls! }
       WorkerPool.push_work(@website, urls)
 
     else
@@ -45,10 +46,14 @@ class Worker
   def pending_urls
     @db.execute("select url from pending_urls").map(&:first)
   end
+
+  def clean_pending_urls!
+    @db.execute("delete from pending_urls")
+  end
 end
 
 trap("INT") {
-  puts "Shutting down, please wait for current generation to finish..."
+  puts "Shutting down, please wait for current page parsings to finish..."
   WorkerPool.shutdown
 }
 
@@ -109,7 +114,7 @@ class WorkerPool
   def self.push_work(website, urls)
     return if urls == []
 
-    puts "Starting generation #{i} with #{urls.size} urls..."
+    puts "> Starting generation #{i} with #{urls.size} urls..."
 
     futures = urls.map do |url|
       Concurrent::Future.execute(executor: thread_pool) {
@@ -117,15 +122,22 @@ class WorkerPool
       }
     end
 
-    urls = futures.flat_map(&:value).compact.uniq
+    urls = futures.flat_map do |future|
+      next(nil) if @shutdown
+      future.value
+    end.compact.uniq
+
     urls = AlreadyVisitedUrls.only_new!(urls)
 
     futures.each do |f|
       raise(f.reason) if f.rejected?
     end
 
-    if @shutdown || true
-      pool(website).borrow { |worker| worker.store_pending_urls!(urls) }
+    if @shutdown
+      pool(website).borrow { |worker|
+        worker.store_pending_urls!(urls)
+        puts "> Stored #{urls.size} urls to keep going later"
+      }
     else
       push_work(@website, urls)
     end

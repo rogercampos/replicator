@@ -2,20 +2,41 @@ require 'httparty'
 require 'digest/md5'
 
 class Parser
-  REGEXP = /<a\s+(?:[^>]*?\s+)?href="([^"]*)"/
+  A_REGEXP = /<a\s+(?:[^>]*?\s+)?href="([^"]*)"/
+  IMG_REGEXP = /<img[^>]+src="([^">]+)"/
+  LINK_REGEXP = /<link\s+(?:[^>]*?\s+)?href="([^"]*)"/
+  SCRIPT_REGEXP = /<script[^>]+src="([^">]+)"/
 
   def initialize(html)
     @html = html
   end
 
-  def urls(only_host: nil)
-    urls = @html.scan(REGEXP).map(&:first)
+  def urls(host:)
+    urls = @html.scan(A_REGEXP).map(&:first)
+    urls += @html.scan(IMG_REGEXP).map(&:first)
+    urls += @html.scan(LINK_REGEXP).map(&:first)
+    urls += @html.scan(SCRIPT_REGEXP).map(&:first)
 
-    if only_host.nil?
-      urls
-    else
-      urls.select { |x| URI(x).host == only_host rescue false }
-    end
+    urls.select! { |x|
+      uri = Addressable::URI.parse(Addressable::URI.escape(x))
+      uri.host.nil? || uri.host == host
+    }
+
+    urls.map {|x|
+      uri = Addressable::URI.parse(Addressable::URI.escape(x))
+
+      if uri.host.nil?
+        uri.host = "supercalorias.com"
+
+        p uri
+
+
+        uri.scheme = "https"
+        uri.to_s
+      else
+        x
+      end
+    }
   end
 end
 
@@ -33,18 +54,25 @@ class PageCrawler
     lock(url) do
       unless already_parsed?(url)
         @db.transaction do
-          puts "Fetching [#{url}]..."
+          # print "."
+          puts "Fetching [#{url}]"
           html = HTTParty.get(url).body
 
-          uri = URI(url)
+          uri = Addressable::URI.parse(url)
+          uri.scheme = nil
+          uri.host = nil
+          path = uri.to_s
 
-          next_urls = Parser.new(html).urls(only_host: uri.host)
+          next_urls = Parser.new(html).urls(host: "supercalorias.com")
 
-          filename = Digest::MD5.hexdigest(uri.path)
+          html = html.gsub("https://supercalorias.com/", "/")
+
+          filename = Digest::MD5.hexdigest(path)
 
           File.write("#{@website}/#{filename}.data", html)
 
-          @db.execute "insert into parsed_urls(url, file) values (?, ?)", [url, "#{filename}.data"]
+          p path
+          @db.execute "insert into parsed_urls(url, file) values (?, ?)", [path, "#{filename}.data"]
         end
 
         AlreadyVisitedUrls.add(url)
