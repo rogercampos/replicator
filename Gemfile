@@ -11,3 +11,6 @@ gem 'httparty'
 gem 'rack'
 
 gem 'addressable'
+gem 'nokogiri'
+
+gem 'minitest'

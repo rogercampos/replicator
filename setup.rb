@@ -4,10 +4,25 @@ require 'bundler/setup'
 require "sqlite3"
 require 'fileutils'
 
-FileUtils.rm_f 'database.db'
-FileUtils.rm_r Dir.glob('camaloon/*')
 
-db = SQLite3::Database.new "database.db"
+require_relative 'lib/domain'
+
+domain = ARGV[0]
+
+if domain.nil?
+  puts "Please use ruby setup.rb <domain name>"
+  exit 1
+end
+
+FileUtils.mkdir_p domain
+
+domain = Domain.new domain
+
+FileUtils.rm_f domain.db_path
+FileUtils.rm_r Dir.glob("#{domain.data_dir}/*")
+
+
+db = SQLite3::Database.new domain.db_path
 
 db.execute <<-SQL
   create table parsed_urls (
@@ -35,6 +50,17 @@ db.execute <<-SQL
 SQL
 
 db.execute "create unique index key_on_pending_urls on pending_urls(url);"
+
+
+db.execute <<-SQL
+  create table tree (
+    source_url     varchar(5000),
+    target_url     varchar(5000)
+  );
+SQL
+
+db.execute "create index key_on_tree_source on tree(source_url);"
+
 
 __END__
 

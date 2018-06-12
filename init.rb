@@ -1,6 +1,15 @@
-URL = 'https://supercalorias.com'
-CONCURRENCY = 3
+require_relative 'lib/replicator'
+require_relative 'lib/domain'
 
-require_relative 'replicator'
+Process.setproctitle("Replicator")
 
-Replicator.new('supercalorias', URL, CONCURRENCY).run!
+domain = ARGV[0]
+
+if domain.nil?
+  puts "Please use ruby init.rb <domain name>"
+  exit 1
+end
+
+domain = Domain.new domain
+
+Replicator.new(domain, 5).run!

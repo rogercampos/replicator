@@ -1,44 +1,37 @@
-goals:
+# Replicator
 
-- replicate an static website for offline browsing
-- respect / maintain original URLS 
-- fast, but controlling max concurrency
+Store a copy of an static website locally for offline browsing. Requires a working ruby interpreter >= 2.3.
 
+Use this to start a crawling.
 
+```
+> ./store http://mysite.com
+```
 
-idea 1:
+Then, you can browse locally by starting a local webrick webserver.
 
-- crawl site and download pages. Follow links.
-- store them untouched locally in a folder structure following the site's paths ("/" -> subdirectory)
-- browse locally by altering local hosts file
-- open a simple webserver to serve static files under localhost
+```
+> ./serve mysite.com
+```
 
+Point your browser to `http://localhost:8080`. 
 
+- The crawling will follow any link of the same domain as the initial url given. But no others.
 
+- All the domain will be crawled, there's no support for filtering.
 
-implementation:
+- By default the crawler will use 3 concurrent workers, meaning the domain will be hit as much as 3 times concurrently.
+You can adjust this setting passing a positive integer as the second argument:
 
-- PageDownloader(url)
-    * check input url is complete (host, domain, path, etc.)
-        * abort if false
-    * start locking by given url (in some global way)
-    * check if given url has already been parsed
-        * abort if true
-    * open database transaction
-    * fetch it
-        * abort if permanent error (404, ...), but retry connection
-    * get HTML
-    * parse for other urls of the same domain.
-    * store contents locally in some file, whatever
-    * store in database this info
-        - `url` -> `stored location`
-    * write database to mark url as already parsed
-    * commit transaction
-    * free lock on url
-    * Open `PageDownloader` for the parsed urls.
+    `./store http://mysite.com 10`
     
-- `PageDownloader` are executed inside workers. there are N concurrent workers
+    Just be responsible and don't flood websites that may not have enough capacity to support it.
+    
+- If you stop a crawler with ctrl-c (or SIGINT), the program will gracefully shutdown and store its temporal state. 
+The next time you start again a crawling on the same domain, the work will be resumed. No time will be lost.
 
-- Worker lifecycle:
-    * open new database connection
-    * 
+- If the program experiences an unexpected error (or it's killed non-gracefully), no temporal state will be saved but 
+all the crawled data up to that point will still be saved. The next time you start again a crawling on the same domain,
+the work will begin from the start again. However, the program will know about the pages it previously crawled and
+skip them, gaining time. It will only need to parse them again to extract urls to follow because it doesn't know
+at what point it will find the next uncrawled page.

@@ -6,19 +6,23 @@ require 'rack/server'
 
 require "sqlite3"
 
+require_relative 'lib/domain'
 
-class HelloWorld
-  def response
-    [200, {}, ['Hello World']]
-  end
+domain = ARGV[0]
+
+if domain.nil?
+  puts "Please use ruby server.rb <domain name>"
+  exit 1
 end
 
-class HelloWorldApp
+$domain = Domain.new domain
+
+class StaticReplica
   def self.call(env)
     request = Rack::Request.new env
-    db = SQLite3::Database.new "database.db"
+    db = SQLite3::Database.new $domain.db_path
 
-    path = request.path
+    path = request.fullpath
 
     result = db.execute "select file from parsed_urls where url = '#{path}';"
 
@@ -26,9 +30,9 @@ class HelloWorldApp
       [404, {}, []]
     else
       filename = result[0][0]
-      [200, {}, [File.read(File.expand_path("supercalorias/#{filename}"))]]
+      [200, {}, [File.read(File.join($domain.data_dir, filename))]]
     end
   end
 end
 
-Rack::Server.start :app => HelloWorldApp
+Rack::Server.start app: StaticReplica
