@@ -53,16 +53,6 @@ SQL
 db.execute "create index key_on_pending_urls on pending_urls(url);"
 
 
-db.execute <<-SQL
-  create table tree (
-    source_url     varchar(5000),
-    target_url     varchar(5000)
-  );
-SQL
-
-db.execute "create index key_on_tree_source on tree(source_url);"
-
-
 __END__
 
 db.execute <<-SQL, 'caca'

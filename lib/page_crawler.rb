@@ -51,9 +51,6 @@ class PageCrawler
           @db.execute "insert into parsed_urls(url, file) values (?, ?)", [normalized_path, filename]
 
           if next_urls.any?
-            insert_values = next_urls.map {|x| "('#{normalized_path}', '#{PathNormalizer.clean(x)}')"}
-            @db.execute "insert into tree(source_url, target_url) values #{insert_values.join(",")}"
-
             @db.execute "insert into pending_urls (url) values #{next_urls.map {|x| "('#{x}')"}.join(", ")};"
           end
 
