@@ -45,11 +45,12 @@ db.execute "create unique index key_on_locks on locks(key);"
 
 db.execute <<-SQL
   create table pending_urls (
-    url     varchar(5000)
+    url     varchar(5000),
+    id integer PRIMARY KEY autoincrement
   );
 SQL
 
-db.execute "create unique index key_on_pending_urls on pending_urls(url);"
+db.execute "create index key_on_pending_urls on pending_urls(url);"
 
 
 db.execute <<-SQL

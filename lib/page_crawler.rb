@@ -27,20 +27,15 @@ class PageCrawler
 
   # expect full url, absolute
   def run(url)
-    next_urls = []
     normalized_path = PathNormalizer.clean(url)
 
     Locker.instance(@domain).lock(normalized_path) do
+      @db.transaction do
+        if already_parsed?(normalized_path)
+          print "*"
 
-      if already_parsed?(normalized_path)
-        # The work has been done before, we just need to grab the next urls to continue
-        next_urls = @db.execute("select target_url from tree where source_url = ?", normalized_path).map {|x|
-          "#{@domain.scheme}://#{@domain.name}#{x[0]}"
-        }
-        print "*"
+        else
 
-      else
-        @db.transaction do
           html = sanitize_str(Downloader.new(url).get)
 
           next_urls = Parser.new(url, html, @domain.scheme).urls(host: @domain.name)
@@ -56,18 +51,22 @@ class PageCrawler
           @db.execute "insert into parsed_urls(url, file) values (?, ?)", [normalized_path, filename]
 
           if next_urls.any?
-            insert_values = next_urls.map { |x| "('#{normalized_path}', '#{PathNormalizer.clean(x)}')" }
+            insert_values = next_urls.map {|x| "('#{normalized_path}', '#{PathNormalizer.clean(x)}')"}
             @db.execute "insert into tree(source_url, target_url) values #{insert_values.join(",")}"
+
+            @db.execute "insert into pending_urls (url) values #{next_urls.map {|x| "('#{x}')"}.join(", ")};"
           end
 
           print "."
         end
 
+        @db.execute "delete from pending_urls where url = ?", url
+
         AlreadyVisitedUrls.instance(@domain).add(normalized_path)
       end
     end
 
-    next_urls
+    true
   end
 
   def sanitize_str(value)
