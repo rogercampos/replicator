@@ -2,16 +2,18 @@
 
 Store a copy of an static website locally for offline browsing. Requires a working ruby interpreter >= 2.3.
 
-Use this to start a crawling.
+Use this to start a crawling, pass website's root path and a local dir to store the copy.
 
 ```
-> ./store http://mysite.com
+> ./store http://mysite.com ~/sites
 ```
+
+This will create the directory `~/sites/mysite.com` which will contain all the scraped data.
 
 Then, you can browse locally by starting a local webrick webserver.
 
 ```
-> ./serve mysite.com
+> ./server ~/sites/mysite.com
 ```
 
 Point your browser to `http://localhost:8080`. 
@@ -23,7 +25,7 @@ Point your browser to `http://localhost:8080`.
 - By default the crawler will use 3 concurrent workers, meaning the domain will be hit as much as 3 times concurrently.
 You can adjust this setting passing a positive integer as the second argument:
 
-    `./store http://mysite.com 10`
+    `./store http://mysite.com ~/sites 10`
     
     Just be responsible and don't flood websites that may not have enough capacity to support it.
     

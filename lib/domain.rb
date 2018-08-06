@@ -3,16 +3,17 @@ require "addressable/uri"
 require_relative 'downloader'
 
 class Domain
-  def initialize(domain)
+  def initialize(domain, root_data_dir)
     @domain = domain
+    @root_data_dir = root_data_dir
   end
 
   def db_path
-    @db_path ||= File.expand_path 'database.db', @domain
+    @db_path ||= File.join @root_data_dir, @domain, 'database.db'
   end
 
   def data_dir
-    @data_dir ||= File.expand_path 'data', @domain
+    @data_dir ||= File.join @root_data_dir, @domain, 'data'
   end
 
   def name
@@ -21,13 +22,13 @@ class Domain
 
   def scheme
     @scheme ||= begin
-      uri = Addressable::URI.parse "http://#{name}"
+      uri = Addressable::URI.parse "https://#{name}"
 
       if Downloader.new(uri.to_s).works?
         uri.scheme
 
       else
-        uri = Addressable::URI.parse "https://#{name}"
+        uri = Addressable::URI.parse "http://#{name}"
 
         if Downloader.new(uri.to_s).works?
           uri.scheme

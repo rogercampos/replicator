@@ -2,8 +2,8 @@ require 'digest/md5'
 require "addressable/uri"
 
 require_relative "parser"
-require_relative "locker"
 require_relative "downloader"
+require_relative "path_builder"
 
 module PathNormalizer
   def self.clean(url)
@@ -29,39 +29,48 @@ class PageCrawler
   def run(url)
     normalized_path = PathNormalizer.clean(url)
 
-    Locker.instance(@domain).lock(normalized_path) do
+    if already_parsed?(normalized_path)
+      # print "*"
+
+    else
+
+      html = sanitize_str(Downloader.new(url).get)
+
+      next_urls = Parser.new(url, html, @domain.scheme).urls(host: @domain.name)
+
+      html = html.gsub(/https?:\/\/#{@domain.name}\//, "/")
+
+      md5 = Digest::MD5.hexdigest(normalized_path)
+
+      filename = "#{md5}.data"
+
+
       @db.transaction do
-        if already_parsed?(normalized_path)
-          print "*"
+        @db.execute "insert or ignore into parsed_urls(url, file) values (?, ?)", [normalized_path, filename]
 
-        else
+        id = @db.execute "select id from parsed_urls where file = ?", filename
 
-          html = sanitize_str(Downloader.new(url).get)
+        if id[0]
+          dir = PathBuilder.calculate(id[0][0])
+          @db.execute "update parsed_urls set file = ? where id = ?", ["#{dir}/#{filename}", id[0][0]]
 
-          next_urls = Parser.new(url, html, @domain.scheme).urls(host: @domain.name)
+          FileUtils.mkdir_p File.join(@domain.data_dir, dir)
 
-          html = html.gsub("#{@domain.scheme}://#{@domain.name}/", "/")
-
-          md5 = Digest::MD5.hexdigest(normalized_path)
-
-          filename = "#{md5}.data"
-
-          File.write(File.join(@domain.data_dir, filename), html)
-
-          @db.execute "insert into parsed_urls(url, file) values (?, ?)", [normalized_path, filename]
+          File.binwrite(File.join(@domain.data_dir, dir, filename), Zlib::Deflate.deflate(html))
 
           if next_urls.any?
-            @db.execute "insert into pending_urls (url) values #{next_urls.map {|x| "('#{x}')"}.join(", ")};"
+            @db.execute "insert or ignore into pending_urls (url) values #{next_urls.map { |x| "('#{x}')" }.join(", ")};"
           end
 
-          print "."
         end
-
-        @db.execute "delete from pending_urls where url = ?", url
-
-        AlreadyVisitedUrls.instance(@domain).add(normalized_path)
       end
+
+      print "."
     end
+
+    @db.execute "delete from pending_urls where url = ?", url
+
+    AlreadyVisitedUrls.instance(@domain).add(normalized_path)
 
     true
   end

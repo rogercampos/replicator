@@ -22,6 +22,6 @@ class AlreadyVisitedUrls
   end
 
   def db
-    @db ||= DbWrapper.new @domain
+    @db ||= DbWrapper.instance @domain
   end
 end

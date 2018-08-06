@@ -14,3 +14,5 @@ gem 'addressable'
 gem 'nokogiri'
 
 gem 'minitest'
+
+gem 'thor'
