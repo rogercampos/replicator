@@ -12,10 +12,11 @@ class Parser
   SCRIPT_REGEXP = /<script[^>]+src="([^">]+)"/i
   CSS_REGEXP = /[:,\s]\s*url\s*\(\s*(?:'(\S*?)'|"(\S*?)"|((?:\\\s|\\\)|\\\"|\\\'|\S)*?))\s*\)/i
 
-  def initialize(original_url, html, scheme)
+  def initialize(original_url, html, scheme, opts = {})
     @original_url = original_url
     @html = html
     @scheme = scheme
+    @opts = opts
   end
 
   def urls(host:)
@@ -52,7 +53,7 @@ class Parser
       end
     }
 
-    urls.map { |x|
+    urls.map! { |x|
       uri = Addressable::URI.parse(Addressable::URI.escape(x))
 
       if uri.host.nil?
@@ -81,6 +82,10 @@ class Parser
       else
         Addressable::URI.parse(Addressable::URI.escape(x)).to_s
       end
-    }.compact.uniq
+    }
+
+    urls.compact!
+    urls.uniq!
+    urls
   end
 end

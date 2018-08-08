@@ -20,9 +20,10 @@ end
 
 
 class PageCrawler
-  def initialize(db, domain)
+  def initialize(db, domain, opts)
     @db = db
     @domain = domain
+    @opts = opts
   end
 
   # expect full url, absolute
@@ -30,19 +31,23 @@ class PageCrawler
     normalized_path = PathNormalizer.clean(url)
 
     if already_parsed?(normalized_path)
-      # print "*"
+      print "*"
 
     else
 
       html = sanitize_str(Downloader.new(url).get)
 
-      next_urls = Parser.new(url, html, @domain.scheme).urls(host: @domain.name)
+      next_urls = Parser.new(url, html, @domain.scheme, blacklisted_paths: @opts[:blacklisted_paths]).urls(host: @domain.name)
+      next_urls = exclude_blacklisted(next_urls)
 
+      # todo: replace only inside links, etc, not body text and only next_url's, not everything
       html = html.gsub(/https?:\/\/#{@domain.name}\//, "/")
 
       md5 = Digest::MD5.hexdigest(normalized_path)
 
       filename = "#{md5}.data"
+
+      next_urls = exclude_already_visited(next_urls)
 
 
       @db.transaction do
@@ -90,5 +95,29 @@ class PageCrawler
 
   def already_parsed?(path)
     AlreadyVisitedUrls.instance(@domain).include?(path)
+  end
+
+  def exclude_already_visited(urls)
+    urls.reject do |url|
+      path = url.gsub(/https?:\/\/#{@domain.name}\//, "/")
+      already_parsed?(path)
+    end
+  end
+
+  def exclude_blacklisted(urls)
+    urls.reject {|url| blacklisted?(url) }
+  end
+
+  def blacklisted?(uri)
+    path = uri.to_s.gsub(/https?:\/\/#{@domain.name}\//, "/")
+
+    return false if path.nil?
+    return false if @opts[:blacklisted_paths].nil?
+
+    res = @opts[:blacklisted_paths].any? { |censured_path|
+      path[0, censured_path.length] == censured_path
+    }
+
+    res
   end
 end

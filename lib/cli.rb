@@ -6,6 +6,7 @@ require_relative 'server'
 require 'thor'
 
 class CLI < Thor
+  option :blacklist, type: :string, aliases: "-b", desc: "File with blacklist of paths to avoid fetching. 1 path per line. Paths will be interpreted as partial matching from the beginning, so '/path/foo' will blacklist also '/path/foo/whatever', etc."
   option :concurrency, type: :numeric, aliases: '-c', desc: "Concurrent fetching workers", default: 3
   desc 'store <domain> <store_dir>', 'Starts downloading process for a given website'
   def store(domain, store_dir)
@@ -22,7 +23,10 @@ class CLI < Thor
 
     Process.setproctitle("Replicator")
 
-    Replicator.new(domain, options[:concurrency]).run!
+    opts = {}
+    opts[:blacklisted_paths] = File.read(options[:blacklist]).split if options[:blacklist]
+
+    Replicator.new(domain, options[:concurrency], opts).run!
   end
 
 

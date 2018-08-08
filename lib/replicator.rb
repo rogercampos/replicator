@@ -11,9 +11,10 @@ require_relative 'already_visited_urls'
 
 
 class Replicator
-  def initialize(domain, n)
+  def initialize(domain, n, opts = {})
     @domain = domain
     @n = n
+    @opts = opts
   end
 
   def run!
@@ -28,7 +29,7 @@ class Replicator
 
     threads = Array.new(@n) do |i|
       Thread.start do
-        Worker.new(@domain, i, @n).start!
+        Worker.new(@domain, i, @n, @opts).start!
       end
     end
 
@@ -54,15 +55,16 @@ class Replicator
 end
 
 class Worker
-  def initialize(domain, index, total)
+  def initialize(domain, index, total, opts)
     @index = index
     @total = total
     @domain = domain
     @db = DbWrapper.instance @domain
+    @opts = opts
   end
 
   def start!
-    page_crawler = PageCrawler.new(@db, @domain)
+    page_crawler = PageCrawler.new(@db, @domain, @opts)
 
     # Finish condition is when there're no more pending_urls. However, when starting a site
     # for the first time there's only the initial root url and this would be wrongly
